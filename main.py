@@ -64,3 +64,4 @@ if __name__ == '__main__':
     generate_dataset_spectrograms(dataset_path)
     # item_path = 'C:/Users/lukiq/Downloads/Test.mp3'
     # spectrograms = load_song_into_spectrograms(item_path)
+    print("test")
