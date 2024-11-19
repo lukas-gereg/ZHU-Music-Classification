@@ -111,7 +111,7 @@ if __name__ == '__main__':
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
     loss = nn.CrossEntropyLoss()
 
-    wandb_config = dict(project="Music-classification-first-experiments", config={
+    wandb_config = dict(project="ZHU-Music-Classification", config={
         "model properties": model_properties,
         "learning rate": lr,
         "image_transforms": str(item_transform),
