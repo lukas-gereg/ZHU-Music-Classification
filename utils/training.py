@@ -6,7 +6,7 @@ import string
 
 from sklearn.metrics import classification_report, confusion_matrix, balanced_accuracy_score, matthews_corrcoef, jaccard_score
 
-from assignment2.utils.validation import Validation
+from utils.validation import Validation
 
 
 class Training:

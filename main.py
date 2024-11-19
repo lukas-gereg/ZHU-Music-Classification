@@ -13,8 +13,8 @@ from torchvision import transforms
 from sklearn.model_selection import train_test_split
 
 
-from assignment2.data.custom_subset import CustomSubset
-from assignment2.utils.cross_validation import CrossValidation
+from data.custom_subset import CustomSubset
+from utils.cross_validation import CrossValidation
 
 def load_song_into_spectrograms(song_path: str, spectrogram_window: float = 30) -> list[Image]:
     y, sr = librosa.load(song_path, sr=None)
