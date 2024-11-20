@@ -4,7 +4,7 @@ import wandb
 import random
 import string
 
-from sklearn.metrics import classification_report, confusion_matrix, balanced_accuracy_score, matthews_corrcoef, jaccard_score
+from sklearn.metrics import classification_report, confusion_matrix, balanced_accuracy_score
 
 from utils.validation import Validation
 
@@ -72,8 +72,6 @@ class Training:
                 zero_division=0.0
             )
 
-            mathews_coeff = matthews_corrcoef(y.detach().numpy(), x.detach().numpy().argmax(-1))
-            jacc_score = jaccard_score(y.detach().numpy(), x.detach().numpy().argmax(-1))
             balanced_accuracy = balanced_accuracy_score(y.detach().numpy(), x.detach().numpy().argmax(-1))
 
             conf_mat = confusion_matrix(
@@ -85,7 +83,7 @@ class Training:
             column_names = list(train_loader.dataset.classes.values())
             conf_mat = conf_mat.tolist()
 
-            print(f"Epoch {epoch + 1} train_report: {dict({'mathews_correlation_coefficient': mathews_coeff, 'jaccard_score': jacc_score, 'balanced_accuracy': balanced_accuracy, **class_report})}, train_loss: {train_loss}, train_confusion_matrix: {conf_mat}")
+            print(f"Epoch {epoch + 1} train_report: {dict({'balanced_accuracy': balanced_accuracy, **class_report})}, train_loss: {train_loss}, train_confusion_matrix: {conf_mat}")
 
             if wandb.run is not None:
                 for index, row in enumerate(conf_mat):
@@ -93,7 +91,7 @@ class Training:
 
                 wandb_table = wandb.Table(data=conf_mat, columns=["names (real ↓/predicted →)"] + column_names)
 
-                wandb.log({f"train_report": {'loss': train_loss, 'mathews_correlation_coefficient': mathews_coeff, 'jaccard_score': jacc_score, 'balanced_accuracy': balanced_accuracy, **class_report},
+                wandb.log({f"train_report": {'loss': train_loss, 'balanced_accuracy': balanced_accuracy, **class_report},
                            f"train_confusion_matrix": wandb_table,
                            "epoch": epoch + 1,
                            }, step=epoch + 1)

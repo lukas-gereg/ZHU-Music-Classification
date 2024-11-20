@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 from torchvision import transforms
 from sklearn.model_selection import train_test_split
 
-
+from data.music_dataset import MusicDataset
 from data.custom_subset import CustomSubset
 from utils.cross_validation import CrossValidation
 
@@ -68,8 +68,8 @@ def generate_dataset_spectrograms(audio_dataset_path):
             spectrograms[0].save(f"{folder_path / file.stem}.png")
 
 if __name__ == '__main__':
-    dataset_path = './archive/Data/genres_original'
-    generate_dataset_spectrograms(dataset_path)
+    # dataset_path = os.path.join('.', 'Data', 'genres_original')
+    # generate_dataset_spectrograms(dataset_path)
     # item_path = 'C:/Users/lukiq/Downloads/Test.mp3'
     # spectrograms = load_song_into_spectrograms(item_path)
     debug = False
@@ -79,24 +79,25 @@ if __name__ == '__main__':
     scheduler = None
     early_stopping = 25
 
-    BATCH_SIZE = 64
-    image_size = (150, 150)
+    BATCH_SIZE = 32
+    image_size = (450, 450)
     color_channels = 3
 
     epochs = 10000
     lr = 0.0003
 
     item_transform = transforms.Compose([transforms.ToTensor(),
-                                         # transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+                                         transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
                                          transforms.Resize(image_size, antialias=True)])
-    base_dataset = Covid19Dataset(os.path.join(".", "COVID-19_Radiography_Dataset"),
-                                  color_channels=color_channels,
-                                  item_transform=item_transform)
 
-    x, y = zip(*[item for item in base_dataset.data])
+    base_dataset = MusicDataset(os.path.join('.', 'Data', 'generated_images'),
+                                item_transform=item_transform,
+                                color_channels=color_channels)
+
+    x, labels = zip(*[item for item in base_dataset.data])
     y_ids = [i for i in range(len(base_dataset))]
 
-    train_ids, test_ids, train_y, test_y = train_test_split(y_ids, y, stratify=y, test_size=0.3,
+    train_ids, test_ids, train_y, test_y = train_test_split(y_ids, labels, stratify=labels, test_size=0.3,
                                                             random_state=random_seed)
     train_ids, validation_ids = train_test_split(train_ids, stratify=train_y, test_size=0.3, random_state=random_seed)
 
@@ -122,7 +123,7 @@ if __name__ == '__main__':
         "loss calculator": str(loss),
         "LR reduce scheduler": str(scheduler),
         "debug": debug,
-        "batch_size": 64,
+        "batch_size": BATCH_SIZE,
         "random_seed": random_seed
     })
 
