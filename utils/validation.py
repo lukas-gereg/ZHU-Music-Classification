@@ -1,6 +1,6 @@
 import torch
 import wandb
-from sklearn.metrics import classification_report, confusion_matrix, balanced_accuracy_score, matthews_corrcoef, jaccard_score
+from sklearn.metrics import classification_report, confusion_matrix, balanced_accuracy_score
 
 
 class Validation:
@@ -47,8 +47,6 @@ class Validation:
                 zero_division=0.0
             )
 
-            mathews_coeff = matthews_corrcoef(y.detach().numpy(), x.detach().numpy().argmax(-1))
-            jacc_score = jaccard_score(y.detach().numpy(), x.detach().numpy().argmax(-1))
             balanced_accuracy = balanced_accuracy_score(y.detach().numpy(), x.detach().numpy().argmax(-1))
 
             conf_mat = confusion_matrix(
@@ -61,7 +59,7 @@ class Validation:
             conf_mat = conf_mat.tolist()
 
             print(
-                f"Epoch {epoch} validation_report: {dict({'mathews_correlation_coefficient': mathews_coeff, 'jaccard_score': jacc_score, 'balanced_accuracy': balanced_accuracy, **class_report})}, validation_loss: {val_loss}, validation_confusion_matrix: {conf_mat}")
+                f"Epoch {epoch} validation_report: {dict({'balanced_accuracy': balanced_accuracy, **class_report})}, validation_loss: {val_loss}, validation_confusion_matrix: {conf_mat}")
 
             if wandb.run is not None:
                 for index, row in enumerate(conf_mat):
@@ -69,7 +67,7 @@ class Validation:
 
                 wandb_table = wandb.Table(data=conf_mat, columns=["names (real ↓/predicted →)"] + column_names)
 
-                wandb.log({f"validation_report": {'loss': val_loss, 'mathews_correlation_coefficient': mathews_coeff, 'jaccard_score': jacc_score, 'balanced_accuracy': balanced_accuracy, **class_report},
+                wandb.log({f"validation_report": {'loss': val_loss, 'balanced_accuracy': balanced_accuracy, **class_report},
                            f"validation_confusion_matrix": wandb_table,
                            }, step=epoch)
 
