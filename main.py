@@ -14,6 +14,7 @@ from sklearn.model_selection import train_test_split
 
 from data.music_dataset import MusicDataset
 from data.custom_subset import CustomSubset
+from models.resnet_music_model import ResNetMusic
 from utils.cross_validation import CrossValidation
 
 def load_song_into_spectrograms(song_path: str, spectrogram_window: float = 30) -> list[Image]:
@@ -80,7 +81,7 @@ if __name__ == '__main__':
     early_stopping = 25
 
     BATCH_SIZE = 32
-    image_size = (450, 450)
+    image_size = (224, 224)
     color_channels = 3
 
     epochs = 10000
@@ -105,9 +106,8 @@ if __name__ == '__main__':
     test_dataset = CustomSubset(base_dataset, test_ids)
     validation_dataset = CustomSubset(base_dataset, validation_ids)
 
-    model_properties = {'color_channels': color_channels, 'image_size': image_size,
-                        'pooling_method_constructor': nn.AdaptiveAvgPool2d}
-    model = CombinedVVGModel(model_properties)
+    model_properties = {'color_channels': color_channels, 'num_classes': len(base_dataset.classes), 'image_size': image_size}
+    model = ResNetMusic(model_properties)
 
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
     loss = nn.CrossEntropyLoss()

@@ -3,7 +3,7 @@ import torch.nn as nn
 import torchvision 
 from torchvision.models import ResNet18_Weights 
 
-from base_model import BaseModel
+from models.base_model import BaseModel
 
 
 # temporary parameters
