@@ -8,3 +8,6 @@ class BaseModel(nn.Module):
 
     def load_weights(self, path: str) -> None:
         self.load_state_dict(torch.load(path))
+
+    def save_weights(self, path: str) -> None:
+        torch.save(self.state_dict(), path)
