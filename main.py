@@ -85,11 +85,13 @@ if __name__ == '__main__':
     color_channels = 3
 
     epochs = 10000
-    lr = 0.0003
+    lr = 0.0001
+    weight_decay = 1e-4  # Added weight decay for regularization
 
     item_transform = transforms.Compose([transforms.ToTensor(),
                                          transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-                                         transforms.Resize(image_size, antialias=True)])
+                                         transforms.Resize(image_size, antialias=True), transforms.RandomHorizontalFlip(p=0.5),
+                                        transforms.RandomAffine(degrees=15), transforms.RandomErasing(p=0.1)])
 
     base_dataset = MusicDataset(os.path.join('.', 'Data', 'generated_images'),
                                 item_transform=item_transform,
@@ -109,7 +111,9 @@ if __name__ == '__main__':
     model_properties = {'color_channels': color_channels, 'num_classes': len(base_dataset.classes), 'image_size': image_size}
     model = ResNetMusic(model_properties)
 
-    optimizer = torch.optim.Adam(model.parameters(), lr=lr)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=weight_decay)
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', patience=5, factor=0.5, verbose=True)
+
     loss = nn.CrossEntropyLoss()
 
     wandb_config = dict(project="ZHU-Music-Classification", entity="ZHU-Music-Classification", config={
@@ -124,7 +128,11 @@ if __name__ == '__main__':
         "LR reduce scheduler": str(scheduler),
         "debug": debug,
         "batch_size": BATCH_SIZE,
-        "random_seed": random_seed
+        "random_seed": random_seed,
+        "data_augmentation": str(item_transform),  # Added data augmentation
+        "model_architecture": "ResNet50",  # Included new architecture
+        "weight_decay": weight_decay,  # Added weight decay
+        "lr_scheduler": "ReduceLROnPlateau"
     })
 
     wandb_login_key = "a9f105e8b3bc98e07700e93201d4b02c1c75106d"

@@ -1,8 +1,9 @@
 import torch
 import torch.nn as nn
 import torchvision 
-from torchvision.models import ResNet18_Weights 
-
+# from torchvision.models import ResNet18_Weights
+from torchvision.models import resnet50
+from torchvision.models import ResNet50_Weights
 from models.base_model import BaseModel
 
 
@@ -36,11 +37,12 @@ class ResNetMusic(BaseModel):
         Initializes model
         """
 
-        self.model = torchvision.models.resnet18(weights=ResNet18_Weights.DEFAULT) # Loading pretrained ResNet18 with the latest available weights
+        # self.model = torchvision.models.resnet18(weights=ResNet18_Weights.DEFAULT) # Loading pretrained ResNet18 with the latest available weights
+        self.model = resnet50(weights=ResNet50_Weights.DEFAULT)
 
-        # Freezing pretrained parameters
+        # Fine-tune layers instead of freezing them
         for param in self.model.parameters():
-            param.requires_grad = False
+            param.requires_grad = True
 
         # Modifying pretrained ResNet18
         self.model.conv1 = nn.Conv2d(in_channels=self.color_channels, 
