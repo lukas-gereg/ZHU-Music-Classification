@@ -78,7 +78,7 @@ if __name__ == '__main__':
     random_seed = 42
 
     scheduler = None
-    early_stopping = 25
+    early_stopping = 10
 
     BATCH_SIZE = 32
     image_size = (224, 224)
@@ -114,7 +114,15 @@ if __name__ == '__main__':
     optimizer = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=weight_decay)
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', patience=5, factor=0.5, verbose=True)
 
-    loss = nn.CrossEntropyLoss()
+    # loss = nn.CrossEntropyLoss()
+
+    # Ensure the device is set correctly
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    # Calculating class weights for the loss function
+    class_counts = [len([y for y in labels if y == c]) for c in range(len(base_dataset.classes))]
+    class_weights = torch.tensor([1.0 / count for count in class_counts]).to(device)  # Move weights to the correct device
+    loss = nn.CrossEntropyLoss(weight=class_weights)
 
     wandb_config = dict(project="ZHU-Music-Classification", entity="ZHU-Music-Classification", config={
         "model properties": model_properties,

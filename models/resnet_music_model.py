@@ -52,8 +52,11 @@ class ResNetMusic(BaseModel):
                                      padding=3
                                     )
         
-        self.model.fc = nn.Linear(self.model.fc.in_features, out_features=self.num_classes) # modifying last layer of ResNet (input from previous layer, output 10 classes(genres))
-
+        # self.model.fc = nn.Linear(self.model.fc.in_features, out_features=self.num_classes) # modifying last layer of ResNet (input from previous layer, output 10 classes(genres))
+        self.model.fc = nn.Sequential(
+            nn.Dropout(0.5),  # Add dropout with 50% rate
+            nn.Linear(self.model.fc.in_features, out_features=self.num_classes)
+        )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
