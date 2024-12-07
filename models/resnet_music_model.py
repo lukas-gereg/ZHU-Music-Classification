@@ -38,7 +38,7 @@ class ResNetMusic(BaseModel):
         """
 
         # self.model = torchvision.models.resnet18(weights=ResNet18_Weights.DEFAULT) # Loading pretrained ResNet18 with the latest available weights
-        self.model = resnet50(weights=ResNet50_Weights.DEFAULT)
+        self.model = torchvision.models.resnet50(weights=ResNet50_Weights.DEFAULT)
 
         # Fine-tune layers instead of freezing them
         for param in self.model.parameters():

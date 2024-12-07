@@ -11,11 +11,13 @@ import librosa.display
 import matplotlib.pyplot as plt
 from torchvision import transforms
 from sklearn.model_selection import train_test_split
+from torch.utils.data import DataLoader, WeightedRandomSampler
 
 from data.music_dataset import MusicDataset
 from data.custom_subset import CustomSubset
 from models.resnet_music_model import ResNetMusic
 from utils.cross_validation import CrossValidation
+from utils.early_stopping import EarlyStopping
 
 def load_song_into_spectrograms(song_path: str, spectrogram_window: float = 30) -> list[Image]:
     y, sr = librosa.load(song_path, sr=None)
@@ -108,21 +110,26 @@ if __name__ == '__main__':
     test_dataset = CustomSubset(base_dataset, test_ids)
     validation_dataset = CustomSubset(base_dataset, validation_ids)
 
+    # Handle class imbalance using WeightedRandomSampler
+    class_counts = [len([y for y in labels if y == c]) for c in range(len(base_dataset.classes))]
+    class_weights = [1.0 / count for count in class_counts]
+    sample_weights = [class_weights[label] for label in labels]
+
+    sampler = WeightedRandomSampler(sample_weights, num_samples=len(sample_weights), replacement=True)
+
+    train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, sampler=sampler)
+    validation_loader = DataLoader(validation_dataset, batch_size=BATCH_SIZE, shuffle=False)
+    test_loader = DataLoader(test_dataset, batch_size=BATCH_SIZE, shuffle=False)
+
     model_properties = {'color_channels': color_channels, 'num_classes': len(base_dataset.classes), 'image_size': image_size}
     model = ResNetMusic(model_properties)
 
     optimizer = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=weight_decay)
-    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', patience=5, factor=0.5, verbose=True)
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=10)
 
-    # loss = nn.CrossEntropyLoss()
+    loss = nn.CrossEntropyLoss()
 
-    # Ensure the device is set correctly
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-    # Calculating class weights for the loss function
-    class_counts = [len([y for y in labels if y == c]) for c in range(len(base_dataset.classes))]
-    class_weights = torch.tensor([1.0 / count for count in class_counts]).to(device)  # Move weights to the correct device
-    loss = nn.CrossEntropyLoss(weight=class_weights)
+    early_stopper = EarlyStopping(patience=5, verbose=True)
 
     wandb_config = dict(project="ZHU-Music-Classification", entity="ZHU-Music-Classification", config={
         "model properties": model_properties,
