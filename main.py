@@ -11,13 +11,11 @@ import librosa.display
 import matplotlib.pyplot as plt
 from torchvision import transforms
 from sklearn.model_selection import train_test_split
-from torch.utils.data import DataLoader, WeightedRandomSampler
 
 from data.music_dataset import MusicDataset
 from data.custom_subset import CustomSubset
 from models.resnet_music_model import ResNetMusic
 from utils.cross_validation import CrossValidation
-from utils.early_stopping import EarlyStopping
 
 def load_song_into_spectrograms(song_path: str, spectrogram_window: float = 30) -> list[Image]:
     y, sr = librosa.load(song_path, sr=None)
@@ -79,8 +77,7 @@ if __name__ == '__main__':
     folds = 5
     random_seed = 42
 
-    scheduler = None
-    early_stopping = 10
+    early_stopping = 20
 
     BATCH_SIZE = 32
     image_size = (224, 224)
@@ -92,8 +89,7 @@ if __name__ == '__main__':
 
     item_transform = transforms.Compose([transforms.ToTensor(),
                                          transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-                                         transforms.Resize(image_size, antialias=True), transforms.RandomHorizontalFlip(p=0.5),
-                                        transforms.RandomAffine(degrees=15), transforms.RandomErasing(p=0.1)])
+                                         transforms.Resize(image_size, antialias=True)])
 
     base_dataset = MusicDataset(os.path.join('.', 'Data', 'generated_images'),
                                 item_transform=item_transform,
@@ -110,17 +106,6 @@ if __name__ == '__main__':
     test_dataset = CustomSubset(base_dataset, test_ids)
     validation_dataset = CustomSubset(base_dataset, validation_ids)
 
-    # Handle class imbalance using WeightedRandomSampler
-    class_counts = [len([y for y in labels if y == c]) for c in range(len(base_dataset.classes))]
-    class_weights = [1.0 / count for count in class_counts]
-    sample_weights = [class_weights[label] for label in labels]
-
-    sampler = WeightedRandomSampler(sample_weights, num_samples=len(sample_weights), replacement=True)
-
-    train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, sampler=sampler)
-    validation_loader = DataLoader(validation_dataset, batch_size=BATCH_SIZE, shuffle=False)
-    test_loader = DataLoader(test_dataset, batch_size=BATCH_SIZE, shuffle=False)
-
     model_properties = {'color_channels': color_channels, 'num_classes': len(base_dataset.classes), 'image_size': image_size}
     model = ResNetMusic(model_properties)
 
@@ -128,8 +113,6 @@ if __name__ == '__main__':
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=10)
 
     loss = nn.CrossEntropyLoss()
-
-    early_stopper = EarlyStopping(patience=5, verbose=True)
 
     wandb_config = dict(project="ZHU-Music-Classification", entity="ZHU-Music-Classification", config={
         "model properties": model_properties,
@@ -144,10 +127,8 @@ if __name__ == '__main__':
         "debug": debug,
         "batch_size": BATCH_SIZE,
         "random_seed": random_seed,
-        "data_augmentation": str(item_transform),  # Added data augmentation
-        "model_architecture": "ResNet50",  # Included new architecture
-        "weight_decay": weight_decay,  # Added weight decay
-        "lr_scheduler": "ReduceLROnPlateau"
+        "data_augmentation": str(item_transform),
+        "weight_decay": weight_decay,
     })
 
     wandb_login_key = "a9f105e8b3bc98e07700e93201d4b02c1c75106d"

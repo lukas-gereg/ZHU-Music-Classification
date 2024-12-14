@@ -41,16 +41,16 @@ class ResNetMusic(BaseModel):
         self.model = torchvision.models.resnet50(weights=ResNet50_Weights.DEFAULT)
 
         # Fine-tune layers instead of freezing them
-        for param in self.model.parameters():
-            param.requires_grad = True
+        # for param in self.model.parameters():
+        #     param.requires_grad = True
 
         # Modifying pretrained ResNet18
-        self.model.conv1 = nn.Conv2d(in_channels=self.color_channels, 
-                                     out_channels=64, 
-                                     kernel_size=7, 
-                                     stride=2, 
-                                     padding=3
-                                    )
+        # self.model.conv1 = nn.Conv2d(in_channels=self.color_channels,
+        #                              out_channels=64,
+        #                              kernel_size=7,
+        #                              stride=2,
+        #                              padding=3
+        #                             )
         
         # self.model.fc = nn.Linear(self.model.fc.in_features, out_features=self.num_classes) # modifying last layer of ResNet (input from previous layer, output 10 classes(genres))
         self.model.fc = nn.Sequential(
