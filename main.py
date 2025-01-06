@@ -15,6 +15,7 @@ from sklearn.model_selection import train_test_split
 from data.music_dataset import MusicDataset
 from data.custom_subset import CustomSubset
 from models.resnet_music_model import ResNetMusic
+from models.one_d_cnn_rnn_music_model import OneDCnnRnnMusicModel
 from utils.cross_validation import CrossValidation
 
 def load_song_into_spectrograms(song_path: str, spectrogram_window: float = 30) -> list[Image]:
@@ -108,8 +109,11 @@ if __name__ == '__main__':
     test_dataset = CustomSubset(base_dataset, test_ids)
     validation_dataset = CustomSubset(base_dataset, validation_ids)
 
-    model_properties = {'color_channels': color_channels, 'num_classes': len(base_dataset.classes), 'image_size': image_size}
-    model = ResNetMusic(model_properties)
+    model_properties = {'color_channels': color_channels, 'num_classes': len(base_dataset.classes),
+                        'image_size': image_size, 'cnn_sizes': [256, 256, 128, 64], 'hidden_size': 512, 'num_layers': 2,
+                        'fc_size': [128]}
+    # model = ResNetMusic(model_properties)
+    model = OneDCnnRnnMusicModel(model_properties)
 
     optimizer = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=weight_decay)
     # scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=10)
