@@ -79,13 +79,15 @@ if __name__ == '__main__':
 
     early_stopping = 20
 
-    BATCH_SIZE = 32
-    image_size = (224, 224)
+    BATCH_SIZE = 64
+    image_size = (448, 448)
     color_channels = 3
 
     epochs = 10000
     lr = 0.0001
     weight_decay = 1e-4  # Added weight decay for regularization
+    scheduler_patience = 3
+    scheduler_factor = 0.5
 
     item_transform = transforms.Compose([transforms.ToTensor(),
                                          transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
@@ -110,8 +112,10 @@ if __name__ == '__main__':
     model = ResNetMusic(model_properties)
 
     optimizer = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=weight_decay)
-    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=10)
-
+    # scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=10)
+    scheduler = None
+    # scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, "min", patience=scheduler_patience,
+    #                                            factor=scheduler_factor)
     loss = nn.CrossEntropyLoss()
 
     wandb_config = dict(project="ZHU-Music-Classification", entity="ZHU-Music-Classification", config={

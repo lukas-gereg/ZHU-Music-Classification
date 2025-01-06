@@ -53,15 +53,38 @@ class ResNetMusic(BaseModel):
         #                             )
         
         # self.model.fc = nn.Linear(self.model.fc.in_features, out_features=self.num_classes) # modifying last layer of ResNet (input from previous layer, output 10 classes(genres))
-        self.model.fc = nn.Sequential(
-            nn.Dropout(0.5),  # Add dropout with 50% rate
-            nn.Linear(self.model.fc.in_features, out_features=self.num_classes)
+        fc_input = self.model.fc.in_features
+
+        self.model.fc = nn.Identity()
+
+        self.drop = nn.Dropout(p=0.2)
+
+        self.fc1 = nn.Sequential(
+            nn.Linear(fc_input, 128),
+            nn.LeakyReLU(inplace=True)
+        )
+
+        # self.fc2 = nn.Sequential(
+        #     nn.Linear(self.fc1.get_submodule('0').out_features, 256),
+        #     nn.LeakyReLU(inplace=True)
+        # )
+
+        self.fc3 = nn.Sequential(
+            nn.Linear(self.fc1.get_submodule('0').out_features, self.num_classes),
+            nn.Softmax(dim=1)
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
         Models forward function
         """
-        return self.model(x)
 
+        x = self.model(x)
 
+        x = self.drop(x)
+
+        x = self.fc1(x)
+        # x = self.fc2(x)
+        x = self.fc3(x)
+
+        return x
