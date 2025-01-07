@@ -80,7 +80,7 @@ if __name__ == '__main__':
 
     early_stopping = 20
 
-    BATCH_SIZE = 64
+    BATCH_SIZE = 4
     image_size = (448, 448)
     color_channels = 3
 
@@ -110,8 +110,8 @@ if __name__ == '__main__':
     validation_dataset = CustomSubset(base_dataset, validation_ids)
 
     model_properties = {'color_channels': color_channels, 'num_classes': len(base_dataset.classes),
-                        'image_size': image_size, 'cnn_sizes': [256, 256, 128, 64], 'hidden_size': 512, 'num_layers': 2,
-                        'fc_size': [128]}
+                        'image_size': image_size, 'cnn_sizes': [256, 256, 128, 128], 'hidden_size': 1024, 'num_layers': 1,
+                        'fc_size': [256, 128]}
     # model = ResNetMusic(model_properties)
     model = OneDCnnRnnMusicModel(model_properties)
 
