@@ -3,6 +3,7 @@ import io
 import math
 import torch
 import wandb
+import optuna
 import pathlib
 import numpy as np
 from PIL import Image
@@ -69,30 +70,39 @@ def generate_dataset_spectrograms(audio_dataset_path):
             spectrograms = load_song_into_spectrograms(file)
             spectrograms[0].save(f"{folder_path / file.stem}.png")
 
-if __name__ == '__main__':
-    # dataset_path = os.path.join('.', 'Data', 'genres_original')
-    # generate_dataset_spectrograms(dataset_path)
-    # item_path = 'C:/Users/lukiq/Downloads/Test.mp3'
-    # spectrograms = load_song_into_spectrograms(item_path)
-    debug = False
-    folds = 5
-    random_seed = 42
+def objective(trial: optuna.Trial) -> float:
+    image_size_square = trial.suggest_int("image_size", 224, 512)
+    cnn_sizes_count = trial.suggest_int("cnn_sizes_count", 1, 5)
+    cnn_sizes = [trial.suggest_int("cnn_size", 32, 512) for _ in range(cnn_sizes_count)]
+    gru_layers_count = trial.suggest_int("gru_layers_count", 1, 3)
+    hidden_size = trial.suggest_int("hidden_size", 128, 512)
+    fc_count = trial.suggest_int("fc_count", 0, 3)
+    fc = [trial.suggest_int("fc", 64, 512) for _ in range(fc_count)]
 
-    early_stopping = 20
+    learning_rate = trial.suggest_float("learning_rate", 1e-4, 1e-2)
+    optim_weight_decay = trial.suggest_float("weight_decay", 1e-4, 1e-2)
 
-    BATCH_SIZE = 64
-    image_size = (448, 448)
     color_channels = 3
-
-    epochs = 10000
-    lr = 0.0001
-    weight_decay = 1e-4  # Added weight decay for regularization
+    model_debug = False
+    folds = 5
+    seed = 42
+    early_stopping = 20
+    batch = 64
     scheduler_patience = 3
     scheduler_factor = 0.5
 
+    model_params = {'color_channels': color_channels,
+                    'image_size': (image_size_square, image_size_square), 'cnn_sizes': cnn_sizes, 'hidden_size': hidden_size, 'num_layers': gru_layers_count,
+                    'fc_size': fc}
+
+    return np.mean(run(seed, model_debug, early_stopping, batch, color_channels, learning_rate, optim_weight_decay, folds, model_params))
+
+def run(seed, debug, early_stopping, batch, color_channels, lr, weight_decay, folds, model_params):
+    epochs = 10000
+
     item_transform = transforms.Compose([transforms.ToTensor(),
                                          transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-                                         transforms.Resize(image_size, antialias=True)])
+                                         transforms.Resize(model_params["image_size"], antialias=True)])
 
     base_dataset = MusicDataset(os.path.join('.', 'Data', 'generated_images'),
                                 item_transform=item_transform,
@@ -102,18 +112,17 @@ if __name__ == '__main__':
     y_ids = [i for i in range(len(base_dataset))]
 
     train_ids, test_ids, train_y, test_y = train_test_split(y_ids, labels, stratify=labels, test_size=0.3,
-                                                            random_state=random_seed)
-    train_ids, validation_ids = train_test_split(train_ids, stratify=train_y, test_size=0.3, random_state=random_seed)
+                                                            random_state=seed)
+    train_ids, validation_ids = train_test_split(train_ids, stratify=train_y, test_size=0.3, random_state=seed)
 
     train_dataset = CustomSubset(base_dataset, train_ids)
     test_dataset = CustomSubset(base_dataset, test_ids)
     validation_dataset = CustomSubset(base_dataset, validation_ids)
 
-    model_properties = {'color_channels': color_channels, 'num_classes': len(base_dataset.classes),
-                        'image_size': image_size, 'cnn_sizes': [256, 256, 128, 64], 'hidden_size': 512, 'num_layers': 2,
-                        'fc_size': [128]}
+    model_params["num_classes"] = len(base_dataset.classes)
+
     # model = ResNetMusic(model_properties)
-    model = OneDCnnRnnMusicModel(model_properties)
+    model = OneDCnnRnnMusicModel(model_params)
 
     optimizer = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=weight_decay)
     # scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=10)
@@ -123,7 +132,7 @@ if __name__ == '__main__':
     loss = nn.CrossEntropyLoss()
 
     wandb_config = dict(project="ZHU-Music-Classification", entity="ZHU-Music-Classification", config={
-        "model properties": model_properties,
+        "model properties": model_params,
         "learning rate": lr,
         "image_transforms": str(item_transform),
         "epochs": epochs,
@@ -133,8 +142,8 @@ if __name__ == '__main__':
         "loss calculator": str(loss),
         "LR reduce scheduler": str(scheduler),
         "debug": debug,
-        "batch_size": BATCH_SIZE,
-        "random_seed": random_seed,
+        "batch_size": batch,
+        "random_seed": seed,
         "data_augmentation": str(item_transform),
         "weight_decay": weight_decay,
     })
@@ -145,8 +154,20 @@ if __name__ == '__main__':
     if wandb_login_key is not None:
         wandb.login(key=wandb_login_key)
 
-    CrossValidation(BATCH_SIZE, folds, debug, random_seed)(epochs, device, optimizer, model, loss,
+    results = CrossValidation(batch, folds, debug, seed)(epochs, device, optimizer, model, loss,
                                                            train_dataset, validation_dataset, test_dataset,
                                                            early_stopping, scheduler, wandb_config)
 
     print(f"training of model complete")
+
+    return results
+
+
+if __name__ == '__main__':
+    # dataset_path = os.path.join('.', 'Data', 'genres_original')
+    # generate_dataset_spectrograms(dataset_path)
+    # item_path = 'C:/Users/lukiq/Downloads/Test.mp3'
+    # spectrograms = load_song_into_spectrograms(item_path)
+
+    study = optuna.create_study(direction='maximize', sampler=optuna.samplers.RandomSampler(seed=42))
+    study.optimize(objective, n_trials=100)
