@@ -70,14 +70,14 @@ def generate_dataset_spectrograms(audio_dataset_path):
             spectrograms = load_song_into_spectrograms(file)
             spectrograms[0].save(f"{folder_path / file.stem}.png")
 
-def objective(trial: optuna.Trial) -> float:
+def objective(trial: optuna.Trial, random_seed) -> float:
     image_size_square = trial.suggest_int("image_size", 224, 512)
     cnn_sizes_count = trial.suggest_int("cnn_sizes_count", 1, 5)
-    cnn_sizes = [trial.suggest_int("cnn_size", 32, 512) for _ in range(cnn_sizes_count)]
+    cnn_sizes = [trial.suggest_int(f"cnn_size_{i}", 32, 512) for i in range(cnn_sizes_count)]
     gru_layers_count = trial.suggest_int("gru_layers_count", 1, 3)
     hidden_size = trial.suggest_int("hidden_size", 128, 512)
     fc_count = trial.suggest_int("fc_count", 0, 3)
-    fc = [trial.suggest_int("fc", 64, 512) for _ in range(fc_count)]
+    fc = [trial.suggest_int(f"fc_{i}", 64, 512) for i in range(fc_count)]
 
     learning_rate = trial.suggest_float("learning_rate", 1e-4, 1e-2)
     optim_weight_decay = trial.suggest_float("weight_decay", 1e-4, 1e-2)
@@ -85,7 +85,6 @@ def objective(trial: optuna.Trial) -> float:
     color_channels = 3
     model_debug = False
     folds = 5
-    seed = 42
     early_stopping = 20
     batch = 64
     scheduler_patience = 3
@@ -95,9 +94,9 @@ def objective(trial: optuna.Trial) -> float:
                     'image_size': (image_size_square, image_size_square), 'cnn_sizes': cnn_sizes, 'hidden_size': hidden_size, 'num_layers': gru_layers_count,
                     'fc_size': fc}
 
-    return np.mean(run(seed, model_debug, early_stopping, batch, color_channels, learning_rate, optim_weight_decay, folds, model_params))
+    return np.mean(run(random_seed, model_debug, early_stopping, batch, color_channels, learning_rate, optim_weight_decay, folds, model_params))
 
-def run(seed, debug, early_stopping, batch, color_channels, lr, weight_decay, folds, model_params):
+def run(random_seed, debug, early_stopping, batch, color_channels, lr, weight_decay, folds, model_params):
     epochs = 10000
 
     item_transform = transforms.Compose([transforms.ToTensor(),
@@ -112,8 +111,8 @@ def run(seed, debug, early_stopping, batch, color_channels, lr, weight_decay, fo
     y_ids = [i for i in range(len(base_dataset))]
 
     train_ids, test_ids, train_y, test_y = train_test_split(y_ids, labels, stratify=labels, test_size=0.3,
-                                                            random_state=seed)
-    train_ids, validation_ids = train_test_split(train_ids, stratify=train_y, test_size=0.3, random_state=seed)
+                                                            random_state=random_seed)
+    train_ids, validation_ids = train_test_split(train_ids, stratify=train_y, test_size=0.3, random_state=random_seed)
 
     train_dataset = CustomSubset(base_dataset, train_ids)
     test_dataset = CustomSubset(base_dataset, test_ids)
@@ -143,7 +142,7 @@ def run(seed, debug, early_stopping, batch, color_channels, lr, weight_decay, fo
         "LR reduce scheduler": str(scheduler),
         "debug": debug,
         "batch_size": batch,
-        "random_seed": seed,
+        "random_seed": random_seed,
         "data_augmentation": str(item_transform),
         "weight_decay": weight_decay,
     })
@@ -154,7 +153,7 @@ def run(seed, debug, early_stopping, batch, color_channels, lr, weight_decay, fo
     if wandb_login_key is not None:
         wandb.login(key=wandb_login_key)
 
-    results = CrossValidation(batch, folds, debug, seed)(epochs, device, optimizer, model, loss,
+    results = CrossValidation(batch, folds, debug, random_seed)(epochs, device, optimizer, model, loss,
                                                            train_dataset, validation_dataset, test_dataset,
                                                            early_stopping, scheduler, wandb_config)
 
@@ -164,10 +163,12 @@ def run(seed, debug, early_stopping, batch, color_channels, lr, weight_decay, fo
 
 
 if __name__ == '__main__':
+    seed = 42
+
     # dataset_path = os.path.join('.', 'Data', 'genres_original')
     # generate_dataset_spectrograms(dataset_path)
     # item_path = 'C:/Users/lukiq/Downloads/Test.mp3'
     # spectrograms = load_song_into_spectrograms(item_path)
 
-    study = optuna.create_study(direction='maximize', sampler=optuna.samplers.RandomSampler(seed=42))
-    study.optimize(objective, n_trials=100)
+    study = optuna.create_study(direction='maximize', sampler=optuna.samplers.RandomSampler(seed=seed))
+    study.optimize(lambda trial: objective(trial, seed), n_trials=100)
