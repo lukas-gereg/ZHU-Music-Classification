@@ -72,12 +72,16 @@ def generate_dataset_spectrograms(audio_dataset_path):
 
 def objective(trial: optuna.Trial, random_seed) -> float:
     image_size_square = trial.suggest_int("image_size", 224, 512)
-    cnn_sizes_count = trial.suggest_int("cnn_sizes_count", 1, 5)
-    cnn_sizes = [trial.suggest_int(f"cnn_size_{i}", 32, 512) for i in range(cnn_sizes_count)]
-    gru_layers_count = trial.suggest_int("gru_layers_count", 1, 3)
-    hidden_size = trial.suggest_int("hidden_size", 128, 512)
+    # cnn_sizes_count = trial.suggest_int("cnn_sizes_count", 1, 5)
+    # cnn_sizes = [trial.suggest_int(f"cnn_size_{i}", 32, 512) for i in range(cnn_sizes_count)]
+    cnn_sizes = []
+    # gru_layers_count = trial.suggest_int("gru_layers_count", 1, 3)
+    gru_layers_count = 0
+    # hidden_size = trial.suggest_int("hidden_size", 128, 512)
+    hidden_size = 0
     fc_count = trial.suggest_int("fc_count", 0, 3)
     fc = [trial.suggest_int(f"fc_{i}", 64, 512) for i in range(fc_count)]
+    drop_chance = trial.suggest_float("drop_chance", 0.0, 0.6)
 
     learning_rate = trial.suggest_float("learning_rate", 1e-4, 1e-2)
     optim_weight_decay = trial.suggest_float("weight_decay", 1e-4, 1e-2)
@@ -92,7 +96,7 @@ def objective(trial: optuna.Trial, random_seed) -> float:
 
     model_params = {'color_channels': color_channels,
                     'image_size': (image_size_square, image_size_square), 'cnn_sizes': cnn_sizes, 'hidden_size': hidden_size, 'num_layers': gru_layers_count,
-                    'fc_size': fc}
+                    'fc_size': fc, 'drop_chance': drop_chance}
 
     return np.mean(run(random_seed, model_debug, early_stopping, batch, color_channels, learning_rate, optim_weight_decay, folds, model_params))
 
@@ -120,8 +124,8 @@ def run(random_seed, debug, early_stopping, batch, color_channels, lr, weight_de
 
     model_params["num_classes"] = len(base_dataset.classes)
 
-    # model = ResNetMusic(model_properties)
-    model = OneDCnnRnnMusicModel(model_params)
+    model = ResNetMusic(model_params)
+    # model = OneDCnnRnnMusicModel(model_params)
 
     optimizer = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=weight_decay)
     # scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=10)
@@ -158,7 +162,7 @@ def run(random_seed, debug, early_stopping, batch, color_channels, lr, weight_de
                                                            early_stopping, scheduler, wandb_config)
 
     print(f"training of model complete")
-
+    print(results)
     return results
 
 

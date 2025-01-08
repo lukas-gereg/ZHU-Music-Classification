@@ -88,6 +88,8 @@ class CrossValidation:
 
             json.dump(dict(enumerate(reformatted_splits)), outfile)
 
+        fold_results = []
+
         for fold, (train_ids, validation_ids) in enumerate(splits):
             if wandb.run is not None:
                 wandb.run.name += f"-fold-{fold}"
@@ -126,6 +128,8 @@ class CrossValidation:
 
             total_loss, results = Evaluation(self.debug)(loss, test_loader, model, device)
 
+            fold_results.append(total_loss)
+
             filename = os.path.join(".", "model_params", f"run-{training.run_name}-params.pth")
 
             file = Path(filename)
@@ -145,3 +149,5 @@ class CrossValidation:
             plt.plot(losses)
 
             plt.show()
+
+        return fold_results
