@@ -12,15 +12,22 @@ import librosa.display
 import matplotlib.pyplot as plt
 from torchvision import transforms
 from sklearn.model_selection import train_test_split
+from audiomentations import Compose, AddGaussianNoise, TimeStretch, PitchShift
 
+from data.dynamic_music_dataset import DynamicMusicDataset
 from data.music_dataset import MusicDataset
 from data.custom_subset import CustomSubset
 from models.resnet_music_model import ResNetMusic
 from models.one_d_cnn_rnn_music_model import OneDCnnRnnMusicModel
 from utils.cross_validation import CrossValidation
 
-def load_song_into_spectrograms(song_path: str, spectrogram_window: float = 30) -> list[Image]:
-    y, sr = librosa.load(song_path, sr=None)
+def load_song_into_spectrograms(song_path: str | None, sound_augmentations: Compose | None = None, spectrogram_window: float = 30, y: np.ndarray = None, sr: int | float | None = None) -> list[Image]:
+    if song_path is not None:
+        y, sr = librosa.load(song_path, sr=None)
+
+    if sound_augmentations is not None:
+        y = sound_augmentations(samples=y, sample_rate=sr)
+
     window_samples = int(sr * spectrogram_window)
     spectrograms = []
 
@@ -54,12 +61,15 @@ def load_song_into_spectrograms(song_path: str, spectrogram_window: float = 30) 
 
     return spectrograms
 
-def generate_dataset_spectrograms(audio_dataset_path):
+def generate_dataset_spectrograms(audio_dataset_path, export_path: str | None = None, sound_augmentations = None) -> None:
+
     path = pathlib.Path(audio_dataset_path)
-    output_path = pathlib.Path(audio_dataset_path).parent / 'generated_images'
+
+    if export_path is None:
+        export_path = pathlib.Path(audio_dataset_path).parent / 'generated_images'
 
     for folder in path.iterdir():
-        folder_path = output_path / folder.name
+        folder_path = export_path / folder.name
         os.makedirs(folder_path, exist_ok=True)
 
         for file in folder.iterdir():
@@ -67,18 +77,15 @@ def generate_dataset_spectrograms(audio_dataset_path):
                 continue
 
             print(f"Generating spectrogram for {file.name}")
-            spectrograms = load_song_into_spectrograms(file)
+            spectrograms = load_song_into_spectrograms(file, sound_augmentations)
             spectrograms[0].save(f"{folder_path / file.stem}.png")
 
-def objective(trial: optuna.Trial, random_seed) -> float:
+def objective(trial: optuna.Trial, random_seed, dataset_path) -> float:
     image_size_square = trial.suggest_int("image_size", 224, 512)
-    # cnn_sizes_count = trial.suggest_int("cnn_sizes_count", 1, 5)
-    # cnn_sizes = [trial.suggest_int(f"cnn_size_{i}", 32, 512) for i in range(cnn_sizes_count)]
-    cnn_sizes = []
-    # gru_layers_count = trial.suggest_int("gru_layers_count", 1, 3)
-    gru_layers_count = 0
-    # hidden_size = trial.suggest_int("hidden_size", 128, 512)
-    hidden_size = 0
+    cnn_sizes_count = trial.suggest_int("cnn_sizes_count", 1, 5)
+    cnn_sizes = [trial.suggest_int(f"cnn_size_{i}", 32, 512) for i in range(cnn_sizes_count)]
+    gru_layers_count = trial.suggest_int("gru_layers_count", 1, 3)
+    hidden_size = trial.suggest_int("hidden_size", 128, 512)
     fc_count = trial.suggest_int("fc_count", 0, 3)
     fc = [trial.suggest_int(f"fc_{i}", 64, 512) for i in range(fc_count)]
     drop_chance = trial.suggest_float("drop_chance", 0.0, 0.6)
@@ -98,18 +105,27 @@ def objective(trial: optuna.Trial, random_seed) -> float:
                     'image_size': (image_size_square, image_size_square), 'cnn_sizes': cnn_sizes, 'hidden_size': hidden_size, 'num_layers': gru_layers_count,
                     'fc_size': fc, 'drop_chance': drop_chance}
 
-    return np.mean(run(random_seed, model_debug, early_stopping, batch, color_channels, learning_rate, optim_weight_decay, folds, model_params))
+    return np.mean(run(random_seed, model_debug, early_stopping, batch, color_channels, learning_rate, optim_weight_decay, folds, model_params, dataset_path))
 
-def run(random_seed, debug, early_stopping, batch, color_channels, lr, weight_decay, folds, model_params):
+def run(random_seed, debug, early_stopping, batch, color_channels, lr, weight_decay, folds, model_params, dataset_path):
     epochs = 10000
+
+
+    sound_augmentation = Compose([AddGaussianNoise(min_amplitude=0.001, max_amplitude=0.005, p=0.3),
+                       TimeStretch(min_rate=0.95, max_rate=1.05, leave_length_unchanged=True, p=0.3),
+                       PitchShift(min_semitones=-1, max_semitones=1, p=0.3)])
 
     item_transform = transforms.Compose([transforms.ToTensor(),
                                          transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
                                          transforms.Resize(model_params["image_size"], antialias=True)])
 
-    base_dataset = MusicDataset(os.path.join('.', 'Data', 'generated_images'),
-                                item_transform=item_transform,
-                                color_channels=color_channels)
+    # base_dataset = MusicDataset(dataset_path,
+    #                             item_transform=item_transform,
+    #                             color_channels=color_channels)
+    base_dataset = DynamicMusicDataset(dataset_path,
+                                       sound_augmentation,
+                                       lambda y, sr, augmentation: load_song_into_spectrograms(None, y=y, sr=sr, sound_augmentations=augmentation)[0],
+                                       item_transform=item_transform)
 
     x, labels = zip(*[item for item in base_dataset.data])
     y_ids = [i for i in range(len(base_dataset))]
@@ -148,6 +164,7 @@ def run(random_seed, debug, early_stopping, batch, color_channels, lr, weight_de
         "batch_size": batch,
         "random_seed": random_seed,
         "data_augmentation": str(item_transform),
+        "music_augmentation": str(sound_augmentation),
         "weight_decay": weight_decay,
     })
 
@@ -162,17 +179,18 @@ def run(random_seed, debug, early_stopping, batch, color_channels, lr, weight_de
                                                            early_stopping, scheduler, wandb_config)
 
     print(f"training of model complete")
-    print(results)
+
     return results
 
 
 if __name__ == '__main__':
     seed = 42
-
-    # dataset_path = os.path.join('.', 'Data', 'genres_original')
-    # generate_dataset_spectrograms(dataset_path)
+    dataset_sound_path = os.path.join('.', 'Data', 'genres_original')
+    generated_dataset_path = os.path.join('.', 'Data', 'generated_images_augmented')
+    # generated_dataset_path = os.path.join('.', 'Data', 'generated_images')
+    # generate_dataset_spectrograms(dataset_sound_path, generated_dataset_path, augment)
     # item_path = 'C:/Users/lukiq/Downloads/Test.mp3'
     # spectrograms = load_song_into_spectrograms(item_path)
 
     study = optuna.create_study(direction='maximize', sampler=optuna.samplers.RandomSampler(seed=seed))
-    study.optimize(lambda trial: objective(trial, seed), n_trials=100)
+    study.optimize(lambda trial: objective(trial, seed, dataset_sound_path), n_trials=100)
