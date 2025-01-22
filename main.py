@@ -5,6 +5,7 @@ import torch
 import wandb
 import optuna
 import pathlib
+import copy as cp
 import numpy as np
 from PIL import Image
 import torch.nn as nn
@@ -134,9 +135,15 @@ def run(random_seed, debug, early_stopping, batch, color_channels, lr, weight_de
                                                             random_state=random_seed)
     train_ids, validation_ids = train_test_split(train_ids, stratify=train_y, test_size=0.3, random_state=random_seed)
 
+    validation_base_dataset = cp.deepcopy(base_dataset)
+    validation_base_dataset.music_transform = None
+
+    test_base_dataset = cp.deepcopy(base_dataset)
+    test_base_dataset.music_transform = None
+
     train_dataset = CustomSubset(base_dataset, train_ids)
-    test_dataset = CustomSubset(base_dataset, test_ids)
-    validation_dataset = CustomSubset(base_dataset, validation_ids)
+    test_dataset = CustomSubset(test_base_dataset, test_ids)
+    validation_dataset = CustomSubset(validation_base_dataset, validation_ids)
 
     model_params["num_classes"] = len(base_dataset.classes)
 
@@ -187,7 +194,7 @@ if __name__ == '__main__':
     seed = 42
     study_name = "ResnetMusicClassification"
     dataset_sound_path = os.path.join('.', 'Data', 'genres_original')
-    generated_dataset_path = os.path.join('.', 'Data', 'generated_images_augmented')
+    # generated_dataset_path = os.path.join('.', 'Data', 'generated_images_augmented')
     # generated_dataset_path = os.path.join('.', 'Data', 'generated_images')
     # generate_dataset_spectrograms(dataset_sound_path, generated_dataset_path, augment)
     # item_path = 'C:/Users/lukiq/Downloads/Test.mp3'

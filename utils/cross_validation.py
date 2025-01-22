@@ -14,6 +14,7 @@ from torch.utils.data import Subset
 import torch.utils.data as torch_utils
 from sklearn.model_selection import StratifiedKFold
 
+from data.dynamic_music_dataset import DynamicMusicDataset
 from models.base_model import BaseModel
 from utils.training import Training
 from utils.evaluation import Evaluation
@@ -32,13 +33,16 @@ class CrossValidation:
         return module.__class__(module.defaults)
 
     @staticmethod
-    def set_dataset_transforms(dataset, data_transforms, label_transforms):
+    def set_dataset_transforms(dataset, data_transforms, label_transforms, audio_transforms = None):
         for sub_dataset in dataset.datasets:
             if isinstance(sub_dataset, Subset):
                 sub_dataset = sub_dataset.dataset
 
             sub_dataset.transform = data_transforms
             sub_dataset.target_transform = label_transforms
+
+            if isinstance(sub_dataset, DynamicMusicDataset):
+                sub_dataset.music_transform = audio_transforms
 
         return dataset
 
@@ -49,15 +53,17 @@ class CrossValidation:
         train_data = train_dataset.dataset if isinstance(train_dataset, Subset) else train_dataset
         train_data_transforms = train_data.transform
         train_label_transforms = train_data.target_transform
+        train_audio_transforms = train_data.music_transform if isinstance(train_dataset, DynamicMusicDataset) else None
 
         validation_data = validation_dataset.dataset if isinstance(validation_dataset, Subset) else validation_dataset
         validation_data_transforms = validation_data.transform
         validation_label_transforms = validation_data.target_transform
+        validation_audio_transforms = validation_data.music_transform if isinstance(validation_data, DynamicMusicDataset) else None
 
         base_dataset = CustomConcatDataset([train_dataset, validation_dataset])
 
-        train_dataset = self.set_dataset_transforms(copy.deepcopy(base_dataset), train_data_transforms, train_label_transforms)
-        validation_dataset = self.set_dataset_transforms(copy.deepcopy(base_dataset), validation_data_transforms, validation_label_transforms)
+        train_dataset = self.set_dataset_transforms(copy.deepcopy(base_dataset), train_data_transforms, train_label_transforms, train_audio_transforms)
+        validation_dataset = self.set_dataset_transforms(copy.deepcopy(base_dataset), validation_data_transforms, validation_label_transforms, validation_audio_transforms)
 
         # TODO when reusing, make sure find_y_by_index is defined, as this is preventing load of x data and making preparation run faster
         labels_list = [[sub_dataset.find_y_by_index(idx) for idx in range(len(sub_dataset))] for sub_dataset in base_dataset.datasets]

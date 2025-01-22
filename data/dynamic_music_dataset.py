@@ -7,14 +7,14 @@ from typing import Callable
 from torchvision import transforms
 from audiomentations import Compose
 
-from assignment2.data.base_dataset import BaseDataset
+from data.base_dataset import BaseDataset
 
 
 class DynamicMusicDataset(BaseDataset):
     def __init__(self,
                  path: str,
                  music_transform:  Compose,
-                 image_generation_method: Callable[[np.ndarray, float | int, Compose], Image.Image],
+                 image_generation_method: Callable[[np.ndarray, float | int, Compose | None], Image.Image],
                  item_transform: transforms.Compose = transforms.Compose([transforms.ToTensor()]),
                  target_transform: any = None
                  ) -> None:
@@ -37,7 +37,7 @@ class DynamicMusicDataset(BaseDataset):
 
             if os.path.exists(items_path):
                 item_paths = os.listdir(items_path)
-                items.extend([(librosa.load(os.path.join(items_path, item_path)), item_path, idx) for item_path in item_paths if item_path != 'jazz.00054.wav'])
+                items.extend([((librosa.load(os.path.join(items_path, item_path)), os.path.join(items_path, item_path)), idx) for item_path in item_paths if item_path != 'jazz.00054.wav'])
 
         return items, classes
 
@@ -45,7 +45,7 @@ class DynamicMusicDataset(BaseDataset):
         return len(self.data)
 
     def __getitem__(self, idx) -> tuple[torch.Tensor, any, str]:
-        (y, sr), item_path, label = self.data[idx]
+        ((y, sr), item_path), label = self.data[idx]
         item = self.loader(y,sr, self.music_transform)
 
         if self.transform is not None:
