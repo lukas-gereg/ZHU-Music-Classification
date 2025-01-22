@@ -168,11 +168,12 @@ def run(random_seed, debug, early_stopping, batch, color_channels, lr, weight_de
 
 if __name__ == '__main__':
     seed = 42
-
+    study_name = "ResnetMusicClassification"
+    # study_name = "1DCnnRnnMusicClassification"
     # dataset_path = os.path.join('.', 'Data', 'genres_original')
     # generate_dataset_spectrograms(dataset_path)
     # item_path = 'C:/Users/lukiq/Downloads/Test.mp3'
     # spectrograms = load_song_into_spectrograms(item_path)
 
-    study = optuna.create_study(direction='maximize', sampler=optuna.samplers.RandomSampler(seed=seed))
+    study = optuna.create_study(direction='maximize', sampler=optuna.samplers.RandomSampler(seed=seed), load_if_exists=True, study_name=study_name)
     study.optimize(lambda trial: objective(trial, seed), n_trials=100)
